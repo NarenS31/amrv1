@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+import os
+import json
+import time
+import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, IterableDataset
+
+IN_DIR  = "kmers_proj/rp8192"
+OUT_DIR = "models/ae"
+MODEL_PATH = os.path.join(OUT_DIR, "ae.pt")
+META_PATH  = os.path.join(OUT_DIR, "ae_meta.json")
+
+LATENT = 256
+EPOCHS = 25
+BATCH  = 512
+LR     = 1e-3
+SEED   = 1337
+DEVICE = "cpu"   # keep deterministic; switch later only if you want
+
+class MemmapBatches(IterableDataset):
+    def __init__(self, npy_path, batch_size, shuffle, seed):
+        self.npy_path = npy_path
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+
+    def __iter__(self):
+        X = np.load(self.npy_path, mmap_mode="r")
+        n = X.shape[0]
+        idx = np.arange(n)
+        if self.shuffle:
+            rng = np.random.default_rng(self.seed)
+            rng.shuffle(idx)
+        for i in range(0, n, self.batch_size):
+            j = min(i + self.batch_size, n)
+            xb = np.asarray(X[idx[i:j]], dtype=np.float32)
+            yield torch.from_numpy(xb)
+
+class AE(nn.Module):
+    def __init__(self, in_dim, latent_dim):
+        super().__init__()
+        self.enc = nn.Sequential(
+            nn.Linear(in_dim, 2048), nn.ReLU(),
+            nn.Linear(2048, 1024), nn.ReLU(),
+            nn.Linear(1024, latent_dim)
+        )
+        self.dec = nn.Sequential(
+            nn.Linear(latent_dim, 1024), nn.ReLU(),
+            nn.Linear(1024, 2048), nn.ReLU(),
+            nn.Linear(2048, in_dim)
+        )
+
+    def forward(self, x):
+        z = self.enc(x)
+        xhat = self.dec(z)
+        return xhat, z
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    torch.manual_seed(SEED)
+    np.random.seed(SEED)
+
+    ztrain_path = os.path.join(IN_DIR, "Z_train.npy")
+    Ztr = np.load(ztrain_path, mmap_mode="r")
+    in_dim = Ztr.shape[1]
+
+    ds = MemmapBatches(ztrain_path, BATCH, shuffle=True, seed=SEED)
+    dl = DataLoader(ds, batch_size=None, num_workers=0)  # iterable yields already-batched tensors
+
+    device = torch.device(DEVICE)
+    model = AE(in_dim, LATENT).to(device)
+    opt = torch.optim.Adam(model.parameters(), lr=LR)
+    loss_fn = nn.MSELoss()
+
+    # Denoising AE: feature dropout during training only
+    DENOISE_DROPOUT = 0.20
+
+    model.train()
+    t0 = time.time()
+    for ep in range(1, EPOCHS + 1):
+        ep_loss = 0.0
+        n_seen = 0
+        for xb in dl:
+            
+            if isinstance(xb, (list, tuple)):
+                x_clean = xb[0]
+            else:
+                x_clean = xb
+            
+            x_clean = x_clean.to(device, non_blocking=True)
+            
+            # ---- denoising corruption: simulate missing k-mer evidence ----
+            mask = (torch.rand_like(x_clean) > DENOISE_DROPOUT).to(x_clean.dtype)
+            x_in = x_clean * mask
+            
+            opt.zero_grad(set_to_none=True)
+            
+            # ---- forward ----
+            if hasattr(model, 'encode') and hasattr(model, 'decode'):
+                z = model.encode(x_in)
+                x_hat = model.decode(z)
+            else:
+                x_hat = model(x_in)
+                if isinstance(x_hat, (tuple, list)):
+                    # model may return (recon, latent) or similar
+                    if len(x_hat) == 2:
+                        a, b = x_hat
+                        if hasattr(a, 'shape') and a.shape == x_clean.shape:
+                            x_hat = a
+                        elif hasattr(b, 'shape') and b.shape == x_clean.shape:
+                            x_hat = b
+                        else:
+                            x_hat = a
+                    else:
+                        x_hat = x_hat[0]
+            
+            # ---- loss against CLEAN target ----
+            loss = loss_fn(x_hat, x_clean)
+            loss.backward()
+            opt.step()
+        print(f"epoch {ep:02d}/{EPOCHS}  mse={ep_loss/n_seen:.6f}")
+
+    torch.save(model.state_dict(), MODEL_PATH)
+
+    meta = {
+        "in_dir": IN_DIR,
+        "ztrain": "Z_train.npy",
+        "in_dim": int(in_dim),
+        "latent_dim": int(LATENT),
+        "epochs": int(EPOCHS),
+        "batch": int(BATCH),
+        "lr": float(LR),
+        "seed": int(SEED),
+        "device": DEVICE,
+        "seconds": round(time.time() - t0, 2),
+    }
+    with open(META_PATH, "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print(f"✓ Saved: {MODEL_PATH}")
+    print(f"✓ Saved: {META_PATH}")
+
+if __name__ == "__main__":
+    main()

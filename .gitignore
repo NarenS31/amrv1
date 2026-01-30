@@ -1,9 +1,34 @@
-# temp genome downloads / extracted folders
-temp_*.zip
-temp_*_data/
-
-# python junk
+# ===== environments / junk =====
+.venv/
 __pycache__/
 *.pyc
-.venv/
 .DS_Store
+*.log
+*.pid
+
+# ===== large data / outputs =====
+data/
+datasets/
+results/
+figures/
+kmers/
+kmers_proj/
+latents/
+models/
+ml_tasks/
+
+# ===== genome related =====
+*.fna
+*.fa
+*.fastq
+*.fq
+*.bam
+*.sam
+*.vcf
+*.gz
+ALL_GENOMES*
+genomes_*.txt
+*_genomes.txt
+
+# ===== streamlit =====
+.streamlit/secrets.toml

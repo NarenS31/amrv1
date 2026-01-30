@@ -1,0 +1,1578 @@
+# # """
+# # Streamlit Demo: AMR Prediction with Uncertainty
+# # Complete ISEF presentation - FIXED VERSION
+# # """
+# # import streamlit as st
+# # import pandas as pd
+# # import numpy as np
+# # import torch
+# # import plotly.graph_objects as go
+# # import sys
+# # import os
+# # sys.path.append('src/src_nn')
+# # from masked_autoencoder import MaskedAutoencoder
+# # from diffusion_model import ConditionalDiffusionModel, DiffusionSchedule
+
+# # st.set_page_config(page_title="AMR Prediction Demo", layout="wide", page_icon="🦠")
+
+# # st.markdown("""
+# # <style>
+# #     .main-header {font-size: 3em; font-weight: bold; color: #1f77b4;}
+# #     .metric-box {padding: 20px; border-radius: 10px; background-color: #f0f2f6;}
+# # </style>
+# # """, unsafe_allow_html=True)
+
+# # st.title("🦠 Robust, Uncertainty-Aware AMR Prediction")
+# # st.markdown("### Three-Stage Pipeline for Clinical Decision Support")
+# # st.markdown("*Novel masked genomic modeling + conditional diffusion*")
+
+# # st.sidebar.header("📍 Navigation")
+# # page = st.sidebar.radio("Select Page",
+# #     ["🏠 Overview", "📊 Results & Tables", "🎯 Live Prediction", "📈 Robustness Analysis", "🔬 Methods"])
+
+# # @st.cache_resource
+# # def load_models():
+# #     device = "cpu"
+
+# #     masked_ae = MaskedAutoencoder().to(device)
+# #     masked_ae.load_state_dict(torch.load('models/masked_ae_final.pt', map_location=device))
+# #     masked_ae.eval()
+
+# #     diffusion = ConditionalDiffusionModel().to(device)
+# #     diffusion.load_state_dict(torch.load('models/diffusion_final.pt', map_location=device))
+# #     diffusion.eval()
+
+# #     schedule = DiffusionSchedule(n_steps=1000).to(device)
+# #     Z = np.load('data/ml/Z_masked_ae.npy')
+
+# #     with open('data/ml/genome_ids_all_complete.txt') as f:
+# #         genome_ids = [line.strip() for line in f]
+
+# #     return masked_ae, diffusion, schedule, Z, genome_ids
+
+# # try:
+# #     masked_ae, diffusion, schedule, Z, genome_ids = load_models()
+# #     models_loaded = True
+# # except Exception as e:
+# #     st.error(f"⚠️ Error loading models: {e}")
+# #     models_loaded = False
+
+# # # ============================================================================
+# # # PAGE 1: OVERVIEW
+# # # ============================================================================
+# # if page == "🏠 Overview":
+
+# #     st.header("🎯 The Problem")
+# #     col1, col2 = st.columns(2)
+
+# #     with col1:
+# #         st.markdown("""
+# #         <div class="metric-box">
+# #         <h3>❌ Challenge 1: Data Quality</h3>
+# #         <ul>
+# #         <li>Real genomes are incomplete & fragmented</li>
+# #         <li>Assemblies have missing k-mers</li>
+# #         <li>Sequencing coverage is uneven</li>
+# #         <li>Standard methods break on poor data</li>
+# #         </ul>
+# #         </div>
+# #         """, unsafe_allow_html=True)
+
+# #     with col2:
+# #         st.markdown("""
+# #         <div class="metric-box">
+# #         <h3>❌ Challenge 2: Uncertainty</h3>
+# #         <ul>
+# #         <li>AST takes 48-72 hours</li>
+# #         <li>Doctors need to act NOW</li>
+# #         <li>Wrong antibiotic = patient death</li>
+# #         <li>Need confidence intervals</li>
+# #         </ul>
+# #         </div>
+# #         """, unsafe_allow_html=True)
+
+# #     st.markdown("---")
+# #     st.header("💡 Our Solution: Three-Stage Pipeline")
+
+# #     col1, col2, col3 = st.columns(3)
+
+# #     with col1:
+# #         st.markdown("""
+# #         <div style='text-align: center; padding: 20px; background-color: #e1f5ff; border-radius: 10px;'>
+# #         <h2>📦 Pipeline 1</h2>
+# #         <h3>Standard AE</h3>
+# #         <p><b>AUROC: 0.703</b></p>
+# #         <p>Baseline pre-training</p>
+# #         </div>
+# #         """, unsafe_allow_html=True)
+
+# #     with col2:
+# #         st.markdown("""
+# #         <div style='text-align: center; padding: 20px; background-color: #c8e6c9; border-radius: 10px;'>
+# #         <h2>🛡️ Pipeline A</h2>
+# #         <h3>Masked AE</h3>
+# #         <p><b>AUROC: 0.757 (+7.7%)</b></p>
+# #         <p>✨ Novel denoising</p>
+# #         <p>🆕 First for AMR</p>
+# #         </div>
+# #         """, unsafe_allow_html=True)
+
+# #     with col3:
+# #         st.markdown("""
+# #         <div style='text-align: center; padding: 20px; background-color: #fff9c4; border-radius: 10px;'>
+# #         <h2>🎲 Pipeline B</h2>
+# #         <h3>Diffusion</h3>
+# #         <p><b>AUROC: 0.629</b></p>
+# #         <p>✨ Probabilistic</p>
+# #         <p>🆕 Uncertainty-aware</p>
+# #         </div>
+# #         """, unsafe_allow_html=True)
+
+# #     st.markdown("---")
+# #     st.header("📊 Key Results")
+
+# #     results_df = pd.DataFrame({
+# #         'Method': ['AMRFinder (Rule-based)', 'Pipeline 1', 'Pipeline A', 'Pipeline B'],
+# #         'Recall': [0.754, 0.68, 0.65, 0.63],
+# #         'AUROC': ['N/A', 0.703, 0.757, 0.629],
+# #         'Uncertainty': ['❌', '❌', '❌', '✅'],
+# #         'Robustness @ 50%': ['Unknown', 0.574, 0.621, 0.621]
+# #     })
+
+# #     st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+# # # ============================================================================
+# # # PAGE 2: RESULTS & TABLES
+# # # ============================================================================
+# # elif page == "📊 Results & Tables":
+# #     st.header("📊 Complete Results & Performance Tables")
+
+# #     if os.path.exists('results/final_comparison.csv'):
+# #         comparison = pd.read_csv('results/final_comparison.csv')
+
+# #         st.subheader("🎯 Overall Performance")
+# #         col1, col2, col3, col4 = st.columns(4)
+
+# #         with col1:
+# #             st.metric("AMRFinder Recall", f"{comparison['amrfinder_recall'].mean():.3f}")
+# #         with col2:
+# #             st.metric("Pipeline 1 AUROC", f"{comparison['pipeline1_auroc'].mean():.3f}")
+# #         with col3:
+# #             st.metric("Pipeline A AUROC", f"{comparison['pipelineA_auroc'].mean():.3f}",
+# #                      f"+{((comparison['pipelineA_auroc'].mean() - comparison['pipeline1_auroc'].mean()) * 100):.1f}%")
+# #         with col4:
+# #             st.metric("Pipeline A Recall", f"{comparison['pipelineA_recall'].mean():.3f}")
+
+# #         st.markdown("---")
+# #         st.subheader("💊 Per-Antibiotic Performance")
+
+# #         fig = go.Figure()
+
+# #         fig.add_trace(go.Bar(
+# #             name='AMRFinder',
+# #             x=comparison['antibiotic'],
+# #             y=comparison['amrfinder_recall'],
+# #             marker_color='lightblue'
+# #         ))
+
+# #         fig.add_trace(go.Bar(
+# #             name='Pipeline A',
+# #             x=comparison['antibiotic'],
+# #             y=comparison['pipelineA_recall'],
+# #             marker_color='darkblue'
+# #         ))
+
+# #         fig.update_layout(
+# #             title='Recall by Antibiotic',
+# #             xaxis_title='Antibiotic',
+# #             yaxis_title='Recall',
+# #             barmode='group',
+# #             height=500,
+# #             hovermode='x unified'
+# #         )
+
+# #         st.plotly_chart(fig, use_container_width=True)
+
+# #         st.subheader("📋 Detailed Table")
+# #         display_df = comparison[['antibiotic', 'n_samples', 'amrfinder_recall',
+# #                                 'pipeline1_auroc', 'pipelineA_auroc']].copy()
+# #         display_df.columns = ['Antibiotic', 'N', 'AMRFinder', 'Pipeline 1', 'Pipeline A']
+# #         st.dataframe(display_df.sort_values('Pipeline A', ascending=False),
+# #                     use_container_width=True, hide_index=True)
+
+# #     st.markdown("---")
+# #     st.subheader("🛡️ Robustness to Corruption")
+
+# #     robustness_df = pd.DataFrame({
+# #         'Corruption': ['0%', '10%', '20%', '30%', '40%', '50%'],
+# #         'Standard AE': [0.648, 0.635, 0.618, 0.599, 0.586, 0.574],
+# #         'Masked AE': [0.673, 0.662, 0.652, 0.642, 0.631, 0.621],
+# #         'Improvement': ['+3.9%', '+4.3%', '+5.5%', '+7.2%', '+7.7%', '+8.2%']
+# #     })
+
+# #     st.dataframe(robustness_df, use_container_width=True, hide_index=True)
+
+# # # ============================================================================
+# # # PAGE 3: LIVE PREDICTION (FIXED)
+# # # ============================================================================
+# # elif page == "🎯 Live Prediction":
+# #     st.header("🎯 Live AMR Prediction Demo")
+# #     st.markdown("*Probabilistic predictions with uncertainty quantification*")
+
+# #     if not models_loaded:
+# #         st.error("⚠️ Models not loaded")
+# #     else:
+# #         st.info("💡 **What you're seeing:** Pipeline B outputs a DISTRIBUTION over R/S/I, not just one answer. This uncertainty is clinically valuable!")
+
+# #         col1, col2 = st.columns(2)
+
+# #         with col1:
+# #             # DROPDOWN for all genomes
+# #             selected_genome = st.selectbox(
+# #                 "Select Genome ID",
+# #                 options=genome_ids[:1000],  # First 1000 for speed
+# #                 index=0,
+# #                 help="Choose any genome from the dataset"
+# #             )
+
+# #         with col2:
+# #             antibiotic = st.selectbox(
+# #                 "Select Antibiotic",
+# #                 ['gentamicin', 'ciprofloxacin', 'tetracycline',
+# #                  'cefepime', 'imipenem', 'tobramycin']
+# #             )
+
+# #         if st.button("🚀 Run Prediction", type="primary"):
+# #             genome_idx = genome_ids.index(selected_genome)
+# #             genome_emb = torch.FloatTensor(Z[genome_idx])
+
+# #             with st.spinner("🔄 Sampling 100 predictions..."):
+# #                 samples = diffusion.sample(genome_emb, schedule, n_samples=100, device='cpu')
+# #                 mean_probs = samples.mean(dim=0).numpy()
+# #                 std_probs = samples.std(dim=0).numpy()
+
+# #             st.success("✅ Complete!")
+
+# #             col1, col2 = st.columns([1, 1])
+
+# #             with col1:
+# #                 st.subheader("📊 Probability Distribution")
+
+# #                 fig = go.Figure(data=[
+# #                     go.Bar(
+# #                         x=['Susceptible', 'Intermediate', 'Resistant'],
+# #                         y=mean_probs,
+# #                         error_y=dict(type='data', array=std_probs),
+# #                         marker_color=['#4CAF50', '#FF9800', '#F44336'],
+# #                         text=[f'{p:.1%}' for p in mean_probs],
+# #                         textposition='outside'
+# #                     )
+# #                 ])
+
+# #                 fig.update_layout(
+# #                     yaxis_title='Probability',
+# #                     yaxis_range=[0, 1.1],
+# #                     height=400
+# #                 )
+
+# #                 st.plotly_chart(fig, use_container_width=True)
+
+# #             with col2:
+# #                 st.subheader("🏥 Clinical Interpretation")
+
+# #                 max_idx = np.argmax(mean_probs)
+# #                 labels = ['Susceptible', 'Intermediate', 'Resistant']
+# #                 prediction = labels[max_idx]
+# #                 confidence = mean_probs[max_idx]
+
+# #                 st.metric("🎯 Most Likely", prediction)
+# #                 st.metric("📈 Confidence", f"{confidence:.1%}")
+
+# #                 entropy = -np.sum(mean_probs * np.log(mean_probs + 1e-10))
+# #                 max_entropy = -np.log(1/3)
+# #                 uncertainty_pct = (entropy / max_entropy) * 100
+
+# #                 st.metric("❓ Uncertainty", f"{uncertainty_pct:.1f}%")
+
+# #                 st.markdown("---")
+# #                 st.markdown("**💡 Clinical Recommendation:**")
+
+# #                 if confidence > 0.7:
+# #                     st.success(f"✅ **High confidence ({confidence:.0%})** in {prediction}")
+# #                     st.write("Prediction is reliable for clinical decision-making")
+# #                 elif confidence > 0.5:
+# #                     st.info(f"ℹ️ **Moderate confidence ({confidence:.0%})**")
+# #                     st.write(f"- {prediction} is most likely ({confidence:.0%})")
+# #                     st.write(f"- But also consider {labels[(max_idx + 1) % 3]} ({mean_probs[(max_idx + 1) % 3]:.0%})")
+# #                     st.write("- Recommend clinical correlation")
+# #                 else:
+# #                     st.warning(f"⚠️ **Low confidence ({confidence:.0%})**")
+# #                     st.write("High uncertainty detected:")
+# #                     for i, label in enumerate(labels):
+# #                         st.write(f"  - {label}: {mean_probs[i]:.0%}")
+# #                     st.write("**Strongly recommend AST confirmation**")
+
+# #                 # Why this matters
+# #                 st.markdown("---")
+# #                 st.markdown("**🎯 Why Uncertainty Matters:**")
+# #                 st.write("Traditional models only say 'Resistant' or 'Susceptible'. Our model shows the full picture:")
+# #                 st.write(f"- S: {mean_probs[0]:.1%} | I: {mean_probs[1]:.1%} | R: {mean_probs[2]:.1%}")
+# #                 st.write("This helps doctors make INFORMED decisions under uncertainty!")
+
+# # # ============================================================================
+# # # PAGE 4: ROBUSTNESS
+# # # ============================================================================
+# # elif page == "📈 Robustness Analysis":
+# #     st.header("📈 Robustness to Data Corruption")
+
+# #     st.write("Real genomes are incomplete. We test performance when k-mers are randomly removed:")
+
+# #     corruption_levels = [0, 10, 20, 30, 40, 50]
+# #     standard_ae = [0.648, 0.635, 0.618, 0.599, 0.586, 0.574]
+# #     masked_ae = [0.673, 0.662, 0.652, 0.642, 0.631, 0.621]
+
+# #     fig = go.Figure()
+
+# #     fig.add_trace(go.Scatter(
+# #         x=corruption_levels, y=standard_ae,
+# #         mode='lines+markers', name='Pipeline 1',
+# #         line=dict(color='lightblue', width=4),
+# #         marker=dict(size=12)
+# #     ))
+
+# #     fig.add_trace(go.Scatter(
+# #         x=corruption_levels, y=masked_ae,
+# #         mode='lines+markers', name='Pipeline A (Masked)',
+# #         line=dict(color='darkblue', width=4),
+# #         marker=dict(size=12)
+# #     ))
+
+# #     fig.update_layout(
+# #         title='Performance vs Corruption',
+# #         xaxis_title='Corruption (%)',
+# #         yaxis_title='AUROC',
+# #         height=500,
+# #         hovermode='x unified'
+# #     )
+
+# #     st.plotly_chart(fig, use_container_width=True)
+
+# #     col1, col2 = st.columns(2)
+# #     with col1:
+# #         st.metric("Standard @ 50%", "0.574", "-11.4%")
+# #     with col2:
+# #         st.metric("Masked @ 50%", "0.621", "-7.7%")
+
+# #     st.success("✅ Masked AE degrades 3.7% less - better for real-world data!")
+
+# # # ============================================================================
+# # # PAGE 5: METHODS
+# # # ============================================================================
+# # elif page == "🔬 Methods":
+# #     st.header("🔬 Methods")
+
+# #     st.subheader("📦 Dataset")
+# #     st.write("- 21,621 Klebsiella genomes")
+# #     st.write("- 15,768 phenotype observations")
+# #     st.write("- 4,096 k-mer features (k=6)")
+
+# #     st.subheader("🧠 Pipeline A: Masked AE")
+# #     st.write("- Masks 30% of k-mers during training")
+# #     st.write("- Forces model to denoise")
+# #     st.write("- 22M parameters")
+
+# #     st.subheader("🎲 Pipeline B: Diffusion")
+# #     st.write("- Conditional diffusion model")
+# #     st.write("- 1000-step forward process")
+# #     st.write("- Samples 100 predictions per genome")
+
+# # st.markdown("---")
+# # st.markdown("*ISEF 2026 | Novel Masked Genomic Modeling for AMR*")
+
+# """
+# Streamlit Demo: AMR Prediction with Uncertainty
+# Complete ISEF presentation - PROFESSIONAL VERSION (no emojis)
+# """
+# from diffusion_model import ConditionalDiffusionModel, DiffusionSchedule
+# from masked_autoencoder import MaskedAutoencoder
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import torch
+# import plotly.graph_objects as go
+# import sys
+# import os
+
+# sys.path.append("src/src_nn")
+
+# # -----------------------------------------------------------------------------
+# # PAGE CONFIG + STYLE
+# # -----------------------------------------------------------------------------
+# st.set_page_config(page_title="AMR Prediction Demo",
+#                    layout="wide", page_icon="")
+
+# st.markdown(
+#     """
+# <style>
+#     .main-header {font-size: 2.2em; font-weight: 700; color: #0B1F3A; margin-bottom: 0.25rem;}
+#     .subheader {font-size: 1.1em; color: #3A4A5B; margin-top: 0rem;}
+#     .card {
+#         padding: 18px 18px 14px 18px;
+#         border-radius: 12px;
+#         background: #F7F8FA;
+#         border: 1px solid #E6E8EE;
+#         box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02);
+#     }
+#     .card h3 {margin: 0 0 8px 0; font-size: 1.05em; color: #0B1F3A;}
+#     .card ul {margin: 0; padding-left: 1.1rem; color: #334155;}
+#     .pill {
+#         display: inline-block;
+#         padding: 3px 10px;
+#         border-radius: 999px;
+#         border: 1px solid #E6E8EE;
+#         background: white;
+#         font-size: 0.85em;
+#         color: #334155;
+#         margin-right: 8px;
+#     }
+#     .divider {height: 1px; background: #E6E8EE; margin: 18px 0;}
+# </style>
+# """,
+#     unsafe_allow_html=True,
+# )
+
+# st.markdown('<div class="main-header">Robust, Uncertainty-Aware AMR Prediction</div>',
+#             unsafe_allow_html=True)
+# st.markdown('<div class="subheader">Three-stage pipeline for decision support under incomplete genomic data</div>', unsafe_allow_html=True)
+# st.markdown('<span class="pill">Masked genomic representation learning</span><span class="pill">Conditional diffusion uncertainty</span>', unsafe_allow_html=True)
+
+# # -----------------------------------------------------------------------------
+# # SIDEBAR NAV
+# # -----------------------------------------------------------------------------
+# st.sidebar.header("Navigation")
+# page = st.sidebar.radio(
+#     "Select section",
+#     ["Overview", "Results", "Live prediction", "Robustness", "Methods"],
+# )
+
+# # -----------------------------------------------------------------------------
+# # MODEL LOADING
+# # -----------------------------------------------------------------------------
+
+
+# @st.cache_resource
+# def load_models():
+#     device = "cpu"
+
+#     masked_ae = MaskedAutoencoder().to(device)
+#     masked_ae.load_state_dict(torch.load(
+#         "models/masked_ae_final.pt", map_location=device))
+#     masked_ae.eval()
+
+#     diffusion = ConditionalDiffusionModel().to(device)
+#     diffusion.load_state_dict(torch.load(
+#         "models/diffusion_final.pt", map_location=device))
+#     diffusion.eval()
+
+#     schedule = DiffusionSchedule(n_steps=1000).to(device)
+
+#     Z = np.load("data/ml/Z_masked_ae.npy")
+
+#     with open("data/ml/genome_ids_all_complete.txt", "r") as f:
+#         genome_ids = [line.strip() for line in f]
+
+#     return masked_ae, diffusion, schedule, Z, genome_ids
+
+
+# try:
+#     masked_ae, diffusion, schedule, Z, genome_ids = load_models()
+#     models_loaded = True
+# except Exception as e:
+#     st.error(f"Model loading failed: {e}")
+#     models_loaded = False
+
+# # -----------------------------------------------------------------------------
+# # OVERVIEW
+# # -----------------------------------------------------------------------------
+# if page == "Overview":
+#     st.header("Problem statement")
+
+#     col1, col2 = st.columns(2)
+
+#     with col1:
+#         st.markdown(
+#             """
+# <div class="card">
+#   <h3>Issue 1: Real-world genomic incompleteness</h3>
+#   <ul>
+#     <li>Assemblies are fragmented and partially missing.</li>
+#     <li>k-mer presence vectors are sparse and coverage-dependent.</li>
+#     <li>Standard pipelines degrade sharply under missingness.</li>
+#   </ul>
+# </div>
+# """,
+#             unsafe_allow_html=True,
+#         )
+
+#     with col2:
+#         st.markdown(
+#             """
+# <div class="card">
+#   <h3>Issue 2: Clinically relevant uncertainty</h3>
+#   <ul>
+#     <li>Phenotypic AST is delayed (often 48–72 hours).</li>
+#     <li>Early treatment decisions are time-critical.</li>
+#     <li>Binary outputs are insufficient; calibrated uncertainty matters.</li>
+#   </ul>
+# </div>
+# """,
+#             unsafe_allow_html=True,
+#         )
+
+#     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+#     st.header("Approach: three-stage pipeline")
+
+#     col1, col2, col3 = st.columns(3)
+
+#     with col1:
+#         st.markdown(
+#             """
+# <div class="card" style="background:#F2F6FF;">
+#   <h3>Pipeline 1: Standard autoencoder baseline</h3>
+#   <ul>
+#     <li>Objective: representation learning for downstream prediction.</li>
+#     <li>Reported AUROC: 0.703</li>
+#   </ul>
+# </div>
+# """,
+#             unsafe_allow_html=True,
+#         )
+
+#     with col2:
+#         st.markdown(
+#             """
+# <div class="card" style="background:#F2FBF6;">
+#   <h3>Pipeline A: Masked autoencoder (denoising)</h3>
+#   <ul>
+#     <li>Objective: robustness to missing k-mers via masking.</li>
+#     <li>Reported AUROC: 0.757 (relative improvement vs baseline)</li>
+#   </ul>
+# </div>
+# """,
+#             unsafe_allow_html=True,
+#         )
+
+#     with col3:
+#         st.markdown(
+#             """
+# <div class="card" style="background:#FFF8EC;">
+#   <h3>Pipeline B: Conditional diffusion (uncertainty)</h3>
+#   <ul>
+#     <li>Objective: predictive distribution over S/I/R, not a point estimate.</li>
+#     <li>Reported AUROC: 0.629</li>
+#   </ul>
+# </div>
+# """,
+#             unsafe_allow_html=True,
+#         )
+
+#     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+#     st.header("Summary results (high-level)")
+
+#     results_df = pd.DataFrame(
+#         {
+#             "Method": ["AMRFinder (rule-based)", "Pipeline 1 (AE)", "Pipeline A (Masked AE)", "Pipeline B (Diffusion)"],
+#             "Recall": [0.754, 0.680, 0.650, 0.630],
+#             "AUROC": ["N/A", 0.703, 0.757, 0.629],
+#             "Uncertainty output": ["No", "No", "No", "Yes"],
+#             "Robustness @ 50% corruption": ["Unknown", 0.574, 0.621, 0.621],
+#         }
+#     )
+
+#     st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+# # -----------------------------------------------------------------------------
+# # RESULTS
+# # -----------------------------------------------------------------------------
+# elif page == "Results":
+#     st.header("Results")
+
+#     if os.path.exists("results/final_comparison.csv"):
+#         comparison = pd.read_csv("results/final_comparison.csv")
+
+#         st.subheader("Aggregate metrics")
+#         col1, col2, col3, col4 = st.columns(4)
+
+#         with col1:
+#             st.metric("AMRFinder recall (mean)",
+#                       f"{comparison['amrfinder_recall'].mean():.3f}")
+#         with col2:
+#             st.metric("Pipeline 1 AUROC (mean)",
+#                       f"{comparison['pipeline1_auroc'].mean():.3f}")
+#         with col3:
+#             delta = (comparison["pipelineA_auroc"].mean() -
+#                      comparison["pipeline1_auroc"].mean()) * 100
+#             st.metric("Pipeline A AUROC (mean)",
+#                       f"{comparison['pipelineA_auroc'].mean():.3f}", f"{delta:+.1f}%")
+#         with col4:
+#             st.metric("Pipeline A recall (mean)",
+#                       f"{comparison['pipelineA_recall'].mean():.3f}")
+
+#         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+#         st.subheader("Per-antibiotic recall")
+
+#         fig = go.Figure()
+#         fig.add_trace(
+#             go.Bar(
+#                 name="AMRFinder",
+#                 x=comparison["antibiotic"],
+#                 y=comparison["amrfinder_recall"],
+#             )
+#         )
+#         fig.add_trace(
+#             go.Bar(
+#                 name="Pipeline A",
+#                 x=comparison["antibiotic"],
+#                 y=comparison["pipelineA_recall"],
+#             )
+#         )
+
+#         fig.update_layout(
+#             title="Recall by antibiotic",
+#             xaxis_title="Antibiotic",
+#             yaxis_title="Recall",
+#             barmode="group",
+#             height=500,
+#             hovermode="x unified",
+#         )
+#         st.plotly_chart(fig, use_container_width=True)
+
+#         st.subheader("Detailed table")
+#         display_df = comparison[
+#             ["antibiotic", "n_samples", "amrfinder_recall",
+#                 "pipeline1_auroc", "pipelineA_auroc"]
+#         ].copy()
+#         display_df.columns = [
+#             "Antibiotic", "N", "AMRFinder recall", "Pipeline 1 AUROC", "Pipeline A AUROC"]
+#         st.dataframe(display_df.sort_values("Pipeline A AUROC",
+#                      ascending=False), use_container_width=True, hide_index=True)
+#     else:
+#         st.warning("Missing file: results/final_comparison.csv")
+
+#     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+#     st.subheader("Robustness under simulated missingness")
+
+#     robustness_df = pd.DataFrame(
+#         {
+#             "Corruption": ["0%", "10%", "20%", "30%", "40%", "50%"],
+#             "Standard AE AUROC": [0.648, 0.635, 0.618, 0.599, 0.586, 0.574],
+#             "Masked AE AUROC": [0.673, 0.662, 0.652, 0.642, 0.631, 0.621],
+#             "Relative improvement": ["+3.9%", "+4.3%", "+5.5%", "+7.2%", "+7.7%", "+8.2%"],
+#         }
+#     )
+#     st.dataframe(robustness_df, use_container_width=True, hide_index=True)
+
+# # -----------------------------------------------------------------------------
+# # LIVE PREDICTION
+# # -----------------------------------------------------------------------------
+# elif page == "Live prediction":
+#     st.header("Live prediction")
+#     st.write("Pipeline B returns a predictive distribution over S/I/R via sampling.")
+
+#     if not models_loaded:
+#         st.error("Models not loaded.")
+#     else:
+#         col1, col2 = st.columns(2)
+
+#         with col1:
+#             selected_genome = st.selectbox(
+#                 "Genome ID",
+#                 options=genome_ids[:1000],  # subset for responsiveness
+#                 index=0,
+#                 help="Subset shown for UI responsiveness. You can expand this if performance allows.",
+#             )
+
+#         with col2:
+#             antibiotic = st.selectbox(
+#                 "Antibiotic",
+#                 ["gentamicin", "ciprofloxacin", "tetracycline",
+#                     "cefepime", "imipenem", "tobramycin"],
+#             )
+
+#         if st.button("Run prediction", type="primary"):
+#             # NOTE: antibiotic is currently unused by the model call below.
+#             # If your diffusion model is antibiotic-conditional, you must pass it in.
+#             genome_idx = genome_ids.index(selected_genome)
+#             genome_emb = torch.tensor(Z[genome_idx], dtype=torch.float32)
+
+#             with st.spinner("Sampling predictive distribution..."):
+#                 samples = diffusion.sample(
+#                     genome_emb, schedule, n_samples=100, device="cpu")
+#                 mean_probs = samples.mean(dim=0).detach().cpu().numpy()
+#                 std_probs = samples.std(dim=0).detach().cpu().numpy()
+
+#             st.success("Prediction complete.")
+
+#             col1, col2 = st.columns([1, 1])
+
+#             with col1:
+#                 st.subheader("Predictive distribution")
+#                 labels = ["Susceptible", "Intermediate", "Resistant"]
+
+#                 fig = go.Figure(
+#                     data=[
+#                         go.Bar(
+#                             x=labels,
+#                             y=mean_probs,
+#                             error_y=dict(type="data", array=std_probs),
+#                             text=[f"{p:.1%}" for p in mean_probs],
+#                             textposition="outside",
+#                         )
+#                     ]
+#                 )
+#                 fig.update_layout(yaxis_title="Probability",
+#                                   yaxis_range=[0, 1.1], height=420)
+#                 st.plotly_chart(fig, use_container_width=True)
+
+#             with col2:
+#                 st.subheader("Interpretation")
+#                 labels = ["Susceptible", "Intermediate", "Resistant"]
+#                 max_idx = int(np.argmax(mean_probs))
+#                 prediction = labels[max_idx]
+#                 confidence = float(mean_probs[max_idx])
+
+#                 st.metric("Most likely class", prediction)
+#                 st.metric("Top-class probability", f"{confidence:.1%}")
+
+#                 entropy = float(-np.sum(mean_probs *
+#                                 np.log(mean_probs + 1e-10)))
+#                 max_entropy = float(-np.log(1.0 / 3.0))
+#                 uncertainty_pct = (entropy / max_entropy) * 100.0
+#                 st.metric("Normalized uncertainty (entropy)",
+#                           f"{uncertainty_pct:.1f}%")
+
+#                 st.markdown('<div class="divider"></div>',
+#                             unsafe_allow_html=True)
+#                 st.subheader("Decision support note")
+
+#                 if confidence >= 0.70:
+#                     st.write(
+#                         f"High-confidence prediction: {prediction} (p={confidence:.2f}).")
+#                     st.write(
+#                         "If your model is calibrated, this may support early decision-making.")
+#                 elif confidence >= 0.50:
+#                     st.write(
+#                         f"Moderate-confidence prediction: {prediction} (p={confidence:.2f}).")
+#                     runner_up = int(np.argsort(mean_probs)[-2])
+#                     st.write(
+#                         f"Second-highest class: {labels[runner_up]} (p={mean_probs[runner_up]:.2f}).")
+#                     st.write(
+#                         "Use with clinical context; consider confirmation testing.")
+#                 else:
+#                     st.write(
+#                         f"Low-confidence prediction (p={confidence:.2f}); uncertainty is high.")
+#                     for i, lab in enumerate(labels):
+#                         st.write(f"- {lab}: p={mean_probs[i]:.2f}")
+#                     st.write(
+#                         "Recommendation: prioritize AST confirmation before acting on this output.")
+
+# # -----------------------------------------------------------------------------
+# # ROBUSTNESS
+# # -----------------------------------------------------------------------------
+# elif page == "Robustness":
+#     st.header("Robustness analysis")
+#     st.write("Evaluation under simulated missingness: randomly removed k-mers.")
+
+#     corruption_levels = [0, 10, 20, 30, 40, 50]
+#     standard_ae = [0.648, 0.635, 0.618, 0.599, 0.586, 0.574]
+#     masked_ae = [0.673, 0.662, 0.652, 0.642, 0.631, 0.621]
+
+#     fig = go.Figure()
+#     fig.add_trace(go.Scatter(x=corruption_levels, y=standard_ae,
+#                   mode="lines+markers", name="Pipeline 1 (AE)"))
+#     fig.add_trace(go.Scatter(x=corruption_levels, y=masked_ae,
+#                   mode="lines+markers", name="Pipeline A (Masked AE)"))
+
+#     fig.update_layout(
+#         title="AUROC vs. corruption",
+#         xaxis_title="Corruption (%)",
+#         yaxis_title="AUROC",
+#         height=520,
+#         hovermode="x unified",
+#     )
+#     st.plotly_chart(fig, use_container_width=True)
+
+#     col1, col2 = st.columns(2)
+#     with col1:
+#         st.metric("Standard AE @ 50% corruption", "0.574")
+#     with col2:
+#         st.metric("Masked AE @ 50% corruption", "0.621")
+
+# # -----------------------------------------------------------------------------
+# # METHODS
+# # -----------------------------------------------------------------------------
+# elif page == "Methods":
+#     st.header("Methods (current draft)")
+
+#     st.subheader("Dataset")
+#     st.write("- 21,621 Klebsiella genomes")
+#     st.write("- 15,768 phenotype observations")
+#     st.write("- 4,096 k-mer features (k=6)")
+
+#     st.subheader("Pipeline A: masked autoencoder")
+#     st.write("- Randomly masks ~30% of k-mer inputs during training")
+#     st.write("- Trains denoising representations intended to be robust to missingness")
+#     st.write("- Reported parameter count: 22M (verify and cite)")
+
+#     st.subheader("Pipeline B: conditional diffusion")
+#     st.write("- Conditional diffusion model for probabilistic prediction")
+#     st.write("- 1,000-step forward process (verify exact schedule details)")
+#     st.write("- Sampling-based predictive distribution (e.g., 100 samples per genome)")
+
+# st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+# st.caption(
+#     "ISEF 2026 | Uncertainty-aware AMR prediction under incomplete genomic data")
+
+"""
+Local Research Dashboard: AMR Prediction with Uncertainty (single-file)
+NIH-grade constraints (best-effort in one file):
+- Reproducibility panel always visible (versions, hashes, seed, timestamp)
+- Deterministic seeding for sampling (best-effort)
+- Explicit data provenance + transform log (raw -> processed -> analyzed)
+- Scientific tone, no marketing language
+- Figures include title/units + captions + interpretation text
+- Config-driven (no magic numbers scattered)
+- Exports: figures (HTML) + aggregate tables (CSV) + report summary (TXT)
+
+NOTE: True NIH-grade expects multi-file separation + tests. This is the least-bad single-file variant.
+"""
+from __future__ import annotations
+from diffusion_model import ConditionalDiffusionModel, DiffusionSchedule
+from masked_autoencoder import MaskedAutoencoder
+
+import hashlib
+import os
+import platform
+import subprocess
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+import torch
+
+# Your modules
+sys.path.append("src/src_nn")
+
+
+# =============================================================================
+# CONFIG (single source of truth)
+# =============================================================================
+CONFIG: Dict[str, Any] = {
+    "project": {"name": "AMR Uncertainty Dashboard", "seed": 1337},
+    "paths": {
+        "model_dir": "models",
+        "data_dir": "data/ml",
+        "results_dir": "results",
+        "export_dir": "exports",
+    },
+    "artifacts": {
+        "masked_ae_weights": "masked_ae_final.pt",
+        "diffusion_weights": "diffusion_final.pt",
+        "embeddings_npy": "Z_masked_ae.npy",
+        "genome_ids_txt": "genome_ids_all_complete.txt",
+        "comparison_csv": "results/final_comparison.csv",
+    },
+    "diffusion": {
+        "n_steps": 1000,
+        "default_samples": 100,
+        "allowed_samples": [25, 50, 100, 250],
+        "allowed_seeds": [1, 13, 42, 1337],
+    },
+    "ui": {
+        "genome_dropdown_limit": 1000,
+        "antibiotics": [
+            "gentamicin",
+            "ciprofloxacin",
+            "tetracycline",
+            "cefepime",
+            "imipenem",
+            "tobramycin",
+        ],
+        "confidence_thresholds": {"high": 0.70, "moderate": 0.50},
+        "class_labels": ["Susceptible", "Intermediate", "Resistant"],
+    },
+    "robustness": {
+        "corruption_levels": [0, 10, 20, 30, 40, 50],
+        "standard_ae_auroc": [0.648, 0.635, 0.618, 0.599, 0.586, 0.574],
+        "masked_ae_auroc": [0.673, 0.662, 0.652, 0.642, 0.631, 0.621],
+    },
+}
+
+
+# =============================================================================
+# TYPES
+# =============================================================================
+@dataclass(frozen=True)
+class TransformRecord:
+    name: str
+    params: Dict[str, Any]
+    rationale: str
+
+
+@dataclass(frozen=True)
+class TransformResult:
+    x: np.ndarray
+    log: List[TransformRecord]
+
+
+@dataclass(frozen=True)
+class DataArtifacts:
+    embeddings: np.ndarray
+    genome_ids: List[str]
+    id_to_idx: Dict[str, int]
+    comparison: Optional[pd.DataFrame]
+
+
+@dataclass(frozen=True)
+class ModelBundle:
+    masked_ae: MaskedAutoencoder
+    diffusion: ConditionalDiffusionModel
+    schedule: DiffusionSchedule
+    device: str
+
+
+@dataclass(frozen=True)
+class ReproInfo:
+    git_commit: str
+    python_version: str
+    platform: str
+    timestamp_utc: str
+    seed: int
+    file_hashes: Dict[str, str]
+    package_versions: Dict[str, str]
+
+
+# =============================================================================
+# REPRODUCIBILITY + HASHING
+# =============================================================================
+def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def get_git_commit_hash() -> str:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode("utf-8").strip()
+    except Exception:
+        return "UNKNOWN (not a git repo)"
+
+
+def get_package_versions(pkgs: Iterable[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for p in pkgs:
+        try:
+            out[p] = version(p)
+        except PackageNotFoundError:
+            out[p] = "NOT INSTALLED"
+    return out
+
+
+def build_repro_info(seed: int, tracked_files: List[Path]) -> ReproInfo:
+    file_hashes = {str(p): (sha256_file(p) if p.exists() else "MISSING")
+                   for p in tracked_files}
+    pkgs = ["streamlit", "numpy", "pandas", "torch", "plotly"]
+    return ReproInfo(
+        git_commit=get_git_commit_hash(),
+        python_version=sys.version.split()[0],
+        platform=f"{platform.system()} {platform.release()} ({platform.machine()})",
+        timestamp_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        seed=seed,
+        file_hashes=file_hashes,
+        package_versions=get_package_versions(pkgs),
+    )
+
+
+def render_repro_panel(info: ReproInfo) -> None:
+    st.sidebar.markdown("## Reproducibility")
+    st.sidebar.write(f"**Git commit:** {info.git_commit}")
+    st.sidebar.write(f"**Python:** {info.python_version}")
+    st.sidebar.write(f"**Platform:** {info.platform}")
+    st.sidebar.write(f"**Run timestamp (UTC):** {info.timestamp_utc}")
+    st.sidebar.write(f"**Global seed:** {info.seed}")
+
+    with st.sidebar.expander("Package versions", expanded=False):
+        for k, v in info.package_versions.items():
+            st.write(f"- {k}: {v}")
+
+    with st.sidebar.expander("Data / artifact hashes", expanded=False):
+        for p, h in info.file_hashes.items():
+            st.write(f"- {p}: `{h}`")
+
+
+# =============================================================================
+# DATA LOADING (RAW -> PROCESSED -> ANALYZED)
+# =============================================================================
+def load_genome_ids(path: Path) -> List[str]:
+    with path.open("r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
+def load_embeddings(path: Path) -> np.ndarray:
+    arr = np.load(str(path))
+    if arr.ndim != 2:
+        raise ValueError(
+            f"Expected 2D embeddings array, got shape={arr.shape}")
+    return arr
+
+
+def load_comparison_csv(path: Path) -> Optional[pd.DataFrame]:
+    if not path.exists():
+        return None
+    return pd.read_csv(path)
+
+
+def load_all_artifacts(cfg: Dict[str, Any]) -> DataArtifacts:
+    data_dir = Path(cfg["paths"]["data_dir"])
+    embeddings_path = data_dir / cfg["artifacts"]["embeddings_npy"]
+    genome_ids_path = data_dir / cfg["artifacts"]["genome_ids_txt"]
+    comparison_path = Path(cfg["artifacts"]["comparison_csv"])
+
+    Z = load_embeddings(embeddings_path)
+    genome_ids = load_genome_ids(genome_ids_path)
+
+    if len(genome_ids) != Z.shape[0]:
+        raise ValueError(
+            f"Genome ID count ({len(genome_ids)}) != embeddings rows ({Z.shape[0]})")
+
+    id_to_idx = {gid: i for i, gid in enumerate(
+        genome_ids)}  # deterministic mapping
+    comparison = load_comparison_csv(comparison_path)
+
+    return DataArtifacts(embeddings=Z, genome_ids=genome_ids, id_to_idx=id_to_idx, comparison=comparison)
+
+
+def transform_embedding(x: np.ndarray) -> TransformResult:
+    log: List[TransformRecord] = []
+
+    x2 = x.astype(np.float32, copy=True)
+    log.append(
+        TransformRecord(
+            name="astype(float32)",
+            params={},
+            rationale="Enforce consistent dtype for torch inference.",
+        )
+    )
+
+    if np.any(~np.isfinite(x2)):
+        raise ValueError(
+            "Embedding contains NaN/Inf; aborting to avoid silent corruption.")
+
+    log.append(
+        TransformRecord(
+            name="finite_check",
+            params={},
+            rationale="Prevent silent propagation of NaN/Inf into probabilistic outputs.",
+        )
+    )
+
+    return TransformResult(x=x2, log=log)
+
+
+# =============================================================================
+# MODELS + INFERENCE (DETERMINISTIC BEST-EFFORT)
+# =============================================================================
+@st.cache_resource
+def load_models(cfg: Dict[str, Any]) -> ModelBundle:
+    model_dir = Path(cfg["paths"]["model_dir"])
+    device = "cpu"
+
+    masked_ae = MaskedAutoencoder().to(device)
+    masked_ae.load_state_dict(torch.load(
+        model_dir / cfg["artifacts"]["masked_ae_weights"], map_location=device))
+    masked_ae.eval()
+
+    diffusion = ConditionalDiffusionModel().to(device)
+    diffusion.load_state_dict(torch.load(
+        model_dir / cfg["artifacts"]["diffusion_weights"], map_location=device))
+    diffusion.eval()
+
+    schedule = DiffusionSchedule(n_steps=int(
+        cfg["diffusion"]["n_steps"])).to(device)
+    return ModelBundle(masked_ae=masked_ae, diffusion=diffusion, schedule=schedule, device=device)
+
+
+@torch.no_grad()
+def sample_predictive_distribution(
+    diffusion: ConditionalDiffusionModel,
+    schedule: DiffusionSchedule,
+    embedding: np.ndarray,
+    n_samples: int,
+    seed: int,
+    device: str = "cpu",
+) -> Tuple[np.ndarray, np.ndarray]:
+    # Best-effort determinism
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    x = torch.tensor(embedding, dtype=torch.float32, device=device)
+    samples = diffusion.sample(x, schedule, n_samples=n_samples, device=device)
+
+    mean_probs = samples.mean(dim=0).detach().cpu().numpy()
+    std_probs = samples.std(dim=0).detach().cpu().numpy()
+
+    if mean_probs.shape != (3,) or std_probs.shape != (3,):
+        raise ValueError(
+            f"Expected (3,) probs, got mean={mean_probs.shape}, std={std_probs.shape}")
+
+    # Validate probabilities
+    if np.any(mean_probs < -1e-6) or np.any(mean_probs > 1 + 1e-6):
+        raise ValueError(
+            "Mean probabilities out of [0,1] range; model output may be invalid.")
+    return mean_probs, std_probs
+
+
+# =============================================================================
+# FIGURES (PLOTLY + CAPTIONS)
+# =============================================================================
+def fig_probability_bar(labels: List[str], mean_probs: np.ndarray, std_probs: np.ndarray) -> go.Figure:
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=labels,
+                y=mean_probs,
+                error_y=dict(type="data", array=std_probs),
+                text=[f"{p:.1%}" for p in mean_probs],
+                textposition="outside",
+            )
+        ]
+    )
+    fig.update_layout(
+        title="Predictive distribution over susceptibility classes",
+        xaxis_title="Class",
+        yaxis_title="Probability (unitless)",
+        yaxis_range=[0, 1.1],
+        height=420,
+    )
+    return fig
+
+
+def fig_robustness(corruption: List[int], standard: List[float], masked: List[float]) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=corruption, y=standard,
+                  mode="lines+markers", name="Standard AE AUROC"))
+    fig.add_trace(go.Scatter(x=corruption, y=masked,
+                  mode="lines+markers", name="Masked AE AUROC"))
+    fig.update_layout(
+        title="AUROC under simulated missingness",
+        xaxis_title="Corruption (%)",
+        yaxis_title="AUROC (unitless)",
+        height=520,
+        hovermode="x unified",
+    )
+    return fig
+
+
+def fig_recall_by_antibiotic(comparison: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name="AMRFinder recall",
+                  x=comparison["antibiotic"], y=comparison["amrfinder_recall"]))
+    fig.add_trace(go.Bar(name="Pipeline A recall",
+                  x=comparison["antibiotic"], y=comparison["pipelineA_recall"]))
+    fig.update_layout(
+        title="Recall by antibiotic",
+        xaxis_title="Antibiotic",
+        yaxis_title="Recall (unitless)",
+        barmode="group",
+        height=520,
+        hovermode="x unified",
+    )
+    return fig
+
+
+# =============================================================================
+# EXPORTS
+# =============================================================================
+def ensure_export_dir(cfg: Dict[str, Any]) -> Path:
+    export_dir = Path(cfg["paths"]["export_dir"])
+    export_dir.mkdir(parents=True, exist_ok=True)
+    return export_dir
+
+
+def export_table_csv(df: pd.DataFrame, export_path: Path) -> None:
+    df.to_csv(export_path, index=False)
+
+
+def export_figure_html(fig: go.Figure, export_path: Path) -> None:
+    # HTML export is deterministic enough and avoids system deps.
+    fig.write_html(str(export_path), include_plotlyjs="cdn")
+
+
+def build_report_summary_text(cfg: Dict[str, Any], repro: ReproInfo, notes: List[str]) -> str:
+    lines = []
+    lines.append(f"{cfg['project']['name']} — Report Summary")
+    lines.append(f"Run timestamp (UTC): {repro.timestamp_utc}")
+    lines.append(f"Git commit: {repro.git_commit}")
+    lines.append(f"Python: {repro.python_version}")
+    lines.append("")
+    lines.append("Methods (high level):")
+    lines.append(
+        "- Masked autoencoder representation learning for robustness to missingness.")
+    lines.append(
+        "- Conditional diffusion sampling to estimate predictive distribution over S/I/R.")
+    lines.append("- Deterministic seeding used for sampling (best-effort).")
+    lines.append("")
+    lines.append("Notes / caveats:")
+    for n in notes:
+        lines.append(f"- {n}")
+    return "\n".join(lines)
+
+
+# =============================================================================
+# APP UI
+# =============================================================================
+st.set_page_config(page_title=CONFIG["project"]["name"], layout="wide")
+
+st.markdown(
+    """
+<style>
+    .title {font-size: 2.0em; font-weight: 700; color: #0B1F3A; margin-bottom: 0.25rem;}
+    .subtitle {font-size: 1.05em; color: #334155; margin-top: 0rem;}
+    .card {padding: 16px; border-radius: 12px; background: #F7F8FA; border: 1px solid #E6E8EE;}
+    .caption {color: #475569; font-size: 0.92em;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    f"<div class='title'>{CONFIG['project']['name']}</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Local-only research dashboard for in-silico AMR prediction and uncertainty</div>", unsafe_allow_html=True)
+
+# Sidebar nav + reproducibility panel
+st.sidebar.header("Navigation")
+section = st.sidebar.radio(
+    "Section",
+    ["Overview", "Methods", "Results", "In silico",
+        "Validation", "Limitations", "References"],
+)
+
+# Load artifacts & models (with visible traceability)
+data_dir = Path(CONFIG["paths"]["data_dir"])
+model_dir = Path(CONFIG["paths"]["model_dir"])
+
+tracked_files = [
+    model_dir / CONFIG["artifacts"]["masked_ae_weights"],
+    model_dir / CONFIG["artifacts"]["diffusion_weights"],
+    data_dir / CONFIG["artifacts"]["embeddings_npy"],
+    data_dir / CONFIG["artifacts"]["genome_ids_txt"],
+    Path(CONFIG["artifacts"]["comparison_csv"]),
+]
+
+repro = build_repro_info(
+    seed=int(CONFIG["project"]["seed"]), tracked_files=tracked_files)
+render_repro_panel(repro)
+
+# Load data (no inline munging)
+try:
+    artifacts = load_all_artifacts(CONFIG)
+    data_ok = True
+except Exception as e:
+    st.error(f"Data loading failed: {e}")
+    data_ok = False
+
+try:
+    models = load_models(CONFIG)
+    models_ok = True
+except Exception as e:
+    st.error(f"Model loading failed: {e}")
+    models_ok = False
+
+# =============================================================================
+# PAGES
+# =============================================================================
+if section == "Overview":
+    st.header("Problem statement (neutral)")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(
+            "<div class='card'><b>Real-world incompleteness</b><br>"
+            "Assemblies can be fragmented; k-mer presence vectors may have missingness driven by coverage and assembly artifacts.</div>",
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            "<div class='card'><b>Decision under uncertainty</b><br>"
+            "A probabilistic output can communicate uncertainty, but only if calibrated and validated.</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.subheader("Claims supported by this dashboard")
+    st.write("- Displays previously computed aggregate results (if provided).")
+    st.write(
+        "- Demonstrates sampling-based predictive distributions for selected genomes.")
+    st.write("- Shows robustness curves under a defined missingness simulation.")
+
+    st.subheader("What this dashboard does not claim")
+    st.write("- Not a clinical decision tool.")
+    st.write("- No prospective clinical validation is presented here.")
+    st.write(
+        "- Calibration quality is not established unless explicitly shown in Results/Validation.")
+
+elif section == "Methods":
+    st.header("Methods")
+    st.write(
+        "This page must be consistent with every figure and output in the dashboard.")
+
+    st.subheader("Data")
+    st.write("- Input: precomputed genome embeddings (NPY) and genome ID list (TXT).")
+    st.write("- Optional: comparison table (CSV) with per-antibiotic metrics.")
+    st.write("- Provenance must be documented externally (dataset source, inclusion/exclusion, leakage controls).")
+
+    st.subheader("Transformations (raw → processed → analyzed)")
+    st.write(
+        "Transformations are explicit and logged at inference time (see In silico).")
+
+    st.subheader("Models")
+    st.write("- Masked autoencoder: used to produce robust embeddings (training not executed inside this app).")
+    st.write(
+        "- Diffusion model: used for sampling predictive distributions over classes.")
+    st.write("- Schedule: fixed number of diffusion steps from config.")
+
+    st.subheader("Determinism")
+    st.write("- Sampling uses explicit seeds; deterministic behavior is best-effort due to framework/runtime constraints.")
+    st.write("- Hashes for model and data artifacts are shown in the sidebar.")
+
+elif section == "Results":
+    st.header("Results")
+
+    if not data_ok:
+        st.stop()
+
+    if artifacts.comparison is None:
+        st.warning(
+            "Comparison CSV not found. Provide results/final_comparison.csv to enable this section.")
+    else:
+        comparison = artifacts.comparison.copy()
+
+        st.subheader("Aggregate metrics")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("AMRFinder recall (mean)",
+                      f"{comparison['amrfinder_recall'].mean():.3f}")
+        with c2:
+            st.metric("Pipeline 1 AUROC (mean)",
+                      f"{comparison['pipeline1_auroc'].mean():.3f}")
+        with c3:
+            delta = (comparison["pipelineA_auroc"].mean() -
+                     comparison["pipeline1_auroc"].mean()) * 100
+            st.metric("Pipeline A AUROC (mean)",
+                      f"{comparison['pipelineA_auroc'].mean():.3f}", f"{delta:+.1f}%")
+        with c4:
+            st.metric("Pipeline A recall (mean)",
+                      f"{comparison['pipelineA_recall'].mean():.3f}")
+
+        fig = fig_recall_by_antibiotic(comparison)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown(
+            "<div class='caption'><b>Caption:</b> Recall by antibiotic for two methods. "
+            "Interpretation requires consistent phenotype mapping rules and sample counts per antibiotic.</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.subheader("Detailed table")
+        display_df = comparison[
+            ["antibiotic", "n_samples", "amrfinder_recall",
+                "pipeline1_auroc", "pipelineA_auroc"]
+        ].copy()
+        display_df.columns = [
+            "Antibiotic", "N", "AMRFinder recall", "Pipeline 1 AUROC", "Pipeline A AUROC"]
+        st.dataframe(display_df.sort_values("Pipeline A AUROC",
+                     ascending=False), use_container_width=True, hide_index=True)
+
+        export_dir = ensure_export_dir(CONFIG)
+        if st.button("Export results table (CSV)"):
+            out = export_dir / "results_table.csv"
+            export_table_csv(display_df, out)
+            st.success(f"Exported: {out}")
+
+        if st.button("Export recall figure (HTML)"):
+            out = export_dir / "recall_by_antibiotic.html"
+            export_figure_html(fig, out)
+            st.success(f"Exported: {out}")
+
+    st.subheader("Robustness under simulated missingness")
+    corr = CONFIG["robustness"]["corruption_levels"]
+    std = CONFIG["robustness"]["standard_ae_auroc"]
+    msk = CONFIG["robustness"]["masked_ae_auroc"]
+
+    fig2 = fig_robustness(corr, std, msk)
+    st.plotly_chart(fig2, use_container_width=True)
+    st.markdown(
+        "<div class='caption'><b>Caption:</b> AUROC as a function of a defined corruption process "
+        "(random removal of features, as implemented in your offline evaluation). "
+        "Interpretation depends on whether corruption matches real assembly missingness.</div>",
+        unsafe_allow_html=True,
+    )
+
+    export_dir = ensure_export_dir(CONFIG)
+    if st.button("Export robustness figure (HTML)"):
+        out = export_dir / "robustness_curve.html"
+        export_figure_html(fig2, out)
+        st.success(f"Exported: {out}")
+
+elif section == "In silico":
+    st.header("In silico inference (live)")
+    st.write(
+        "This section performs local inference using stored embeddings and diffusion sampling.")
+
+    if not (data_ok and models_ok):
+        st.stop()
+
+    # Parameter sweep explorer (required)
+    st.subheader("Sampling parameters")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        n_samples = st.selectbox(
+            "Number of samples", CONFIG["diffusion"]["allowed_samples"], index=2)
+    with c2:
+        seed = st.selectbox(
+            "Sampling seed", CONFIG["diffusion"]["allowed_seeds"], index=3)
+    with c3:
+        genome_limit = int(CONFIG["ui"]["genome_dropdown_limit"])
+        st.write(f"Genome list limit: {genome_limit}")
+
+    st.subheader("Input selection")
+    g = st.selectbox("Genome ID", artifacts.genome_ids[:genome_limit])
+
+    # Important: do not pretend antibiotic-conditioning exists unless it actually does.
+    antibiotic = st.selectbox(
+        "Antibiotic (display only; not used in inference unless wired in model)", CONFIG["ui"]["antibiotics"])
+
+    if st.button("Run inference"):
+        idx = artifacts.id_to_idx[g]
+        raw_emb = artifacts.embeddings[idx]
+
+        # Explicit transformation pipeline + log
+        tr = transform_embedding(raw_emb)
+
+        st.subheader("Data provenance and transformations")
+        st.write("Raw source: embeddings NPY row indexed by genome ID list.")
+        st.dataframe(
+            pd.DataFrame([{"step": i + 1, "name": r.name, "params": r.params,
+                         "rationale": r.rationale} for i, r in enumerate(tr.log)]),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        mean_probs, std_probs = sample_predictive_distribution(
+            diffusion=models.diffusion,
+            schedule=models.schedule,
+            embedding=tr.x,
+            n_samples=int(n_samples),
+            seed=int(seed),
+            device=models.device,
+        )
+
+        labels = CONFIG["ui"]["class_labels"]
+        fig = fig_probability_bar(labels, mean_probs, std_probs)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown(
+            "<div class='caption'><b>Caption:</b> Predictive distribution estimated by repeated diffusion samples. "
+            "Error bars represent sample standard deviation. "
+            "This is not calibration; it is sampling variability under the model.</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Interpretation (neutral, not clinical)
+        st.subheader("Interpretation (non-clinical)")
+        top_idx = int(np.argmax(mean_probs))
+        top_p = float(mean_probs[top_idx])
+
+        entropy = float(-np.sum(mean_probs * np.log(mean_probs + 1e-10)))
+        max_entropy = float(-np.log(1.0 / 3.0))
+        norm_unc = 100.0 * entropy / max_entropy
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Most likely class", labels[top_idx])
+        with c2:
+            st.metric("Top-class probability", f"{top_p:.3f}")
+        with c3:
+            st.metric("Normalized entropy", f"{norm_unc:.1f}%")
+
+        # Export
+        export_dir = ensure_export_dir(CONFIG)
+        if st.button("Export this figure + summary"):
+            fig_out = export_dir / f"predictive_distribution_{g}.html"
+            export_figure_html(fig, fig_out)
+
+            notes = [
+                f"Antibiotic selection shown: {antibiotic} (not used in inference unless model is conditioned).",
+                "Sampling variability shown; calibration not assessed unless separately validated.",
+            ]
+            txt = build_report_summary_text(CONFIG, repro, notes)
+            txt_out = export_dir / f"report_summary_{g}.txt"
+            txt_out.write_text(txt, encoding="utf-8")
+
+            st.success(f"Exported: {fig_out} and {txt_out}")
+
+elif section == "Validation":
+    st.header("Validation")
+    st.write("This is where you prove you are not fooling yourself.")
+
+    st.subheader(
+        "Required sanity checks (you must implement offline and show here)")
+    st.write(
+        "- Same genome, same seed, same n_samples → identical output (or explain non-determinism).")
+    st.write(
+        "- Different seed → distribution should vary but mean should be stable within tolerance.")
+    st.write(
+        "- Input perturbation test: small embedding noise → bounded output change (sensitivity).")
+    st.write(
+        "- Failure case logging: detect NaN/Inf, out-of-range probs, shape mismatch.")
+
+    st.subheader("Controls")
+    st.write("- Negative control: shuffled embeddings should collapse performance.")
+    st.write(
+        "- Positive control: known resistant genotype subset should shift predicted distribution.")
+    st.write(
+        "- Baseline comparator outputs for same cases (rule-based / logistic regression).")
+
+    st.subheader("What would invalidate these results")
+    st.write(
+        "- Evidence of leakage (same lineage in train/test) causing inflated AUROC.")
+    st.write("- Poor calibration (high-confidence wrong predictions).")
+    st.write("- Robustness simulation not matching real missingness patterns.")
+
+elif section == "Limitations":
+    st.header("Limitations")
+    st.write("- Antibiotic conditioning is not implemented in this app unless your diffusion model explicitly takes it.")
+    st.write(
+        "- This dashboard does not establish clinical utility or calibration by default.")
+    st.write("- Robustness curves depend on the realism of the corruption model.")
+    st.write("- Reproducibility is best-effort; strict determinism may vary across machines without containerization.")
+
+elif section == "References":
+    st.header("References")
+    st.write("Add real citations. No placeholders. Minimum expected:")
+    st.write("- Dataset source(s) and accession info.")
+    st.write("- AMRFinder reference.")
+    st.write("- Masked autoencoder / denoising representation learning references.")
+    st.write(
+        "- Diffusion model reference(s) for conditional sampling and uncertainty.")
+    st.write("- Evaluation metrics references (AUROC, PR-AUC, calibration metrics).")
