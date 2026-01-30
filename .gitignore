@@ -1,0 +1,9 @@
+# temp genome downloads / extracted folders
+temp_*.zip
+temp_*_data/
+
+# python junk
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
